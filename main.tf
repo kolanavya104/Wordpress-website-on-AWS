@@ -121,3 +121,38 @@ resource "aws_db_subnet_group" "wordpress_subnet" {
 
 
 
+
+# Create an EC2 instance for bastion
+resource "aws_instance" "bastion" {
+  ami           = "ami-0866a3c8686eaeeba"  # Ubuntu AMI in us-east-1
+  instance_type = var.instance_type
+  key_name      = var.key_name
+  subnet_id     = module.vpc.public_subnets[0]
+# Use vpc_security_group_ids instead of security_groups
+  vpc_security_group_ids = [aws_security_group.bastion_sg.id]
+
+
+  user_data = <<-EOF
+  #!/bin/bash
+  sudo apt update && sudo apt upgrade -y
+  sudo apt install apache2 -y
+  sudo apt install php libapache2-mod-php php-mysql php-xml php-mbstring php-curl php-gd -y
+# Restart Apache to apply the changes
+  sudo systemctl restart apache2
+# Install MySQL client
+  sudo apt-get install -y mysql-client
+# Set up WordPress
+  wget https://wordpress.org/latest.tar.gz
+  tar -xzf latest.tar.gz
+  sudo mv wordpress/* /var/www/html/
+  sudo chown -R www-data:www-data /var/www/html/
+  sudo chmod -R 755 /var/www/html/
+  sudo rm /var/www/html/index.html
+# Restart Apache again to ensure PHP changes take effect
+  sudo systemctl restart apache2
+  EOF
+
+  tags = {
+    Name = "WordPress-EC2"
+  }
+}
