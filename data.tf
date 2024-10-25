@@ -18,3 +18,5 @@ data "aws_ami" "amazon_linux" {
 data "aws_key_pair" "default" {
   key_name = var.key_name
 }
+
+
