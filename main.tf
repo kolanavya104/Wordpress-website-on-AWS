@@ -4,30 +4,10 @@ resource "aws_instance" "wordpress" {
   instance_type = var.instance_type
   key_name      = var.key_name
   subnet_id     = module.vpc.private_subnets[0]
-# Use vpc_security_group_ids instead of security_groups
+  # Use vpc_security_group_ids instead of security_groups
   vpc_security_group_ids = [aws_security_group.wordpress_sg.id]
-
-
-  user_data = <<-EOF
-  #!/bin/bash
-  sudo apt update && sudo apt upgrade -y
-  sudo apt install apache2 -y
-  sudo apt install php libapache2-mod-php php-mysql php-xml php-mbstring php-curl php-gd -y
-# Restart Apache to apply the changes
-  sudo systemctl restart apache2
-# Install MySQL client
-  sudo apt-get install -y mysql-client
-# Set up WordPress
-  sudo wget https://wordpress.org/latest.tar.gz
-  sudo tar -xzf latest.tar.gz
-  sudo mv wordpress/* /var/www/html/
-  sudo chown -R www-data:www-data /var/www/html/
-  sudo chmod -R 755 /var/www/html/
-  sudo rm /var/www/html/index.html
-# Restart Apache again to ensure PHP changes take effect
-  sudo systemctl restart apache2
-  EOF
-
+  user_data = file("files/userdata.sh")
+  
   tags = {
     Name = "WordPress-EC2"
   }
@@ -52,7 +32,6 @@ resource "aws_lb" "wordpress_alb" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.wordpress_sg.id]
   subnets            = module.vpc.public_subnets
-
   enable_deletion_protection = false
 }
 
@@ -120,3 +99,4 @@ resource "aws_db_subnet_group" "wordpress_subnet" {
     Name = "WordPress-DB-Subnet"
   }
 }
+
