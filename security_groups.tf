@@ -1,8 +1,9 @@
-resource "aws_security_group" "wordpress_sg" {
-  name   = "wordpress-sg"
+# Security Group for the ALB
+resource "aws_security_group" "alb_sg" {
+  name   = "alb-sg"
   vpc_id = module.vpc.vpc_id
 
-  # Inbound rule: Allow HTTP traffic from anywhere
+  # Allow HTTP and HTTPS access from anywhere for the ALB
   ingress {
     from_port   = 80
     to_port     = 80
@@ -10,70 +11,88 @@ resource "aws_security_group" "wordpress_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Inbound rule: Allow HTTPS traffic from anywhere (optional)
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  # Inbound rule: Allow SSH access from the bastion host
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.1.0/32"]  # Replace with your bastion host IP
-  }
-  # Inbound rule: Allow SSH access from the bastion host
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.1.0/24"]  # Replace with your bastion host IP
-  }
 
-  # Outbound rule: Allow all outbound traffic
+  # Allow all outbound traffic from the ALB
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"  # This allows all outbound traffic
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  # Outbound rule: Allow all outbound traffic
-  egress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"  # This allows all outbound traffic
-    cidr_blocks = ["10.0.1.0/24"]
+
+  tags = {
+    Name = "ALB-SG"
   }
-  # Outbound rule: Allow all outbound traffic
-  egress {
+}
+
+# Updated Security Group for WordPress EC2 instance
+resource "aws_security_group" "wordpress_sg" {
+  name   = "wordpress-ec2-sg"
+  vpc_id = module.vpc.vpc_id
+
+  # Allow inbound HTTP/HTTPS traffic only from the ALB security group
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Original Inbound rule for SSH access from the bastion host
+  ingress {
     from_port   = 22
     to_port     = 22
-    protocol    = "tcp"  # This allows all outbound traffic
+    protocol    = "tcp"
     cidr_blocks = ["10.0.1.0/32"]
   }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.1.0/24"]
+  }
+
+  # Allow all outbound traffic (Unchanged)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
     Name = "WordPress-EC2-SG"
   }
 }
 
-
-
-# Security Group for RDS
+# Security Group for RDS (MySQL)
 resource "aws_security_group" "rds_sg" {
-  name   = "rds-sg"
+  name   = "rds-mysql-sg"
   vpc_id = module.vpc.vpc_id
 
-  # Allow MySQL access only from the WordPress EC2 instance
+  # Allow MySQL access only from the WordPress EC2 security group (Unchanged)
   ingress {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.wordpress_sg.id]  # This is good practice
+    security_groups = [aws_security_group.wordpress_sg.id]
   }
 
-  # Consider restricting outbound traffic if not necessary
+  # Allow all outbound traffic (Unchanged)
   egress {
     from_port   = 0
     to_port     = 0
@@ -85,6 +104,3 @@ resource "aws_security_group" "rds_sg" {
     Name = "RDS-MySQL-SG"
   }
 }
-
-
-
